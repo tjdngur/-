@@ -1,0 +1,209 @@
+import os
+from flask import Flask, render_template_string, request, jsonify
+from werkzeug.utils import secure_filename
+from PIL import Image
+import numpy as np
+
+app = Flask(__name__)
+UPLOAD_FOLDER = 'static/uploads'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# 업로드 및 정적 파일 폴더 자동 생성
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs('static', exist_ok=True)
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# HTML 코드를 파이썬 내부에 포함 (index.html 역할)
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프라이팬 긁힘 판별 AI</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+        h1 { color: #333; font-size: 24px; margin-bottom: 10px; }
+        p { color: #666; font-size: 14px; margin-bottom: 25px; }
+        .upload-box {
+            border: 2px dashed #007bff;
+            border-radius: 8px;
+            padding: 30px;
+            cursor: pointer;
+            background: #fafbfc;
+            transition: 0.3s;
+            display: block;
+        }
+        .upload-box:hover { background: #f0f4f8; }
+        input[type="file"] { display: none; }
+        .preview-img {
+            max-width: 100%;
+            max-height: 250px;
+            margin-top: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+        .btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 20px;
+            width: 100%;
+            transition: 0.2s;
+        }
+        .btn:hover { background-color: #0056b3; }
+        .result-box {
+            margin-top: 25px;
+            padding: 15px;
+            border-radius: 6px;
+            background: #e9ecef;
+            display: none;
+            text-align: left;
+        }
+        .result-box h3 { margin: 0 0 8px 0; color: #333; font-size: 18px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🍳 프라이팬 긁힘 진단 AI</h1>
+    <p>프라이팬 사진을 업로드하여 코팅 손상 상태를 확인해보세요.</p>
+
+    <label class="upload-box" id="dropZone">
+        <span>📁 이곳을 클릭하여 사진을 선택하세요</span>
+        <input type="file" id="fileInput" accept="image/*">
+    </label>
+
+    <div>
+        <img id="preview" class="preview-img" alt="미리보기">
+    </div>
+
+    <button class="btn" id="uploadBtn" style="display:none;">AI 분석 시작하기</button>
+
+    <div class="result-box" id="resultBox">
+        <h3 id="resultTitle">진단 결과</h3>
+        <p id="resultText"></p>
+    </div>
+</div>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const resultBox = document.getElementById('resultBox');
+    const resultText = document.getElementById('resultText');
+
+    let selectedFile = null;
+
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+                uploadBtn.style.display = 'block';
+                resultBox.style.display = 'none';
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+
+    uploadBtn.addEventListener('click', () => {
+        if (!selectedFile) return;
+
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+
+        uploadBtn.textContent = '분석 중...';
+        uploadBtn.disabled = true;
+
+        fetch('/predict', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            uploadBtn.textContent = 'AI 분석 시작하기';
+            uploadBtn.disabled = false;
+            if (data.success) {
+                resultBox.style.display = 'block';
+                resultText.innerHTML = `<strong>상태:</strong> ${data.result}<br><strong>신뢰도:</strong> ${data.confidence}`;
+            } else {
+                alert(data.error || '분석 중 오류가 발생했습니다.');
+            }
+        })
+        .catch(err => {
+            uploadBtn.textContent = 'AI 분석 시작하기';
+            uploadBtn.disabled = false;
+            console.error(err);
+            alert('서버 통신 오류가 발생했습니다.');
+        });
+    });
+</script>
+
+</body>
+</html>
+"""
+
+@app.route('/')
+def index():
+    return render_template_string(HTML_TEMPLATE)
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    if 'file' not in request.files:
+        return jsonify({'error': '파일이 없습니다.'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': '선택된 파일이 없습니다.'}), 400
+        
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        
+        # --- [추후 실제 AI 모델 연동부] ---
+        # model = tf.keras.models.load_model('my_model.h5') 등을 통해 예측 수행
+        
+        # 임시 테스트 결과 반환
+        simulated_result = "경미한 긁힘 (Scratch Level 2)"
+        confidence = "89.5%"
+        
+        return jsonify({
+            'success': True,
+            'image_url': f'/{filepath}',
+            'result': simulated_result,
+            'confidence': confidence
+        })
+        
+    return jsonify({'error': '지원하지 않는 파일 형식입니다.'}), 400
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
