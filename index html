@@ -1,0 +1,328 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>프라이팬 긁힘 AI 분석</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f3f5f9;
+      color: #202938;
+    }
+
+    header {
+      background: #182235;
+      color: white;
+      padding: 26px 20px;
+      text-align: center;
+    }
+
+    header h1 { margin: 0 0 10px; }
+    header p { margin: 0; color: #d2dbea; }
+
+    main {
+      max-width: 900px;
+      margin: 28px auto;
+      padding: 0 16px;
+    }
+
+    .card {
+      background: white;
+      padding: 24px;
+      margin-bottom: 20px;
+      border-radius: 16px;
+      box-shadow: 0 4px 18px #1720330c;
+    }
+
+    h2 { margin-top: 0; }
+
+    .upload-area {
+      padding: 30px 15px;
+      border: 2px dashed #9ba9bd;
+      border-radius: 12px;
+      text-align: center;
+      background: #fafbfe;
+    }
+
+    input, select, button {
+      font-size: 16px;
+      margin-top: 12px;
+    }
+
+    button {
+      border: none;
+      border-radius: 9px;
+      padding: 13px 18px;
+      background: #2463eb;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:disabled {
+      background: #a4aec0;
+      cursor: not-allowed;
+    }
+
+    button:hover:not(:disabled) { background: #174cc1; }
+
+    #preview {
+      display: none;
+      max-width: 100%;
+      max-height: 420px;
+      object-fit: contain;
+      margin: 20px auto 0;
+      border-radius: 10px;
+    }
+
+    .status {
+      background: #edf4ff;
+      padding: 14px;
+      border-radius: 9px;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+    }
+
+    .result {
+      display: none;
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 12px;
+      background: #f6f8fc;
+    }
+
+    .grade {
+      font-size: 27px;
+      font-weight: bold;
+      margin: 8px 0;
+    }
+
+    .bar-row { margin: 18px 0; }
+
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 7px;
+    }
+
+    .bar-bg {
+      height: 12px;
+      background: #e3e8f0;
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .bar {
+      height: 100%;
+      width: 0;
+      background: #2463eb;
+      transition: width 0.3s;
+    }
+
+    .small {
+      color: #637087;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .grade-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+    }
+
+    .grade-item {
+      background: #f6f8fc;
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    footer {
+      text-align: center;
+      color: #718096;
+      font-size: 13px;
+      padding: 25px;
+    }
+  </style>
+</head>
+
+<body>
+<header>
+  <h1>🍳 프라이팬 긁힘 AI</h1>
+  <p>사진을 업로드하여 표면 손상 상태를 분석하세요.</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>1. 프라이팬 사진 업로드</h2>
+
+    <div class="upload-area">
+      <p>프라이팬 표면 사진을 선택하세요.</p>
+      <input id="imageInput" type="file" accept="image/*">
+      <br>
+      <img id="preview" alt="업로드한 프라이팬 사진">
+    </div>
+
+    <button id="analyzeBtn" disabled>사진 분석하기</button>
+
+    <div id="status" class="status" style="margin-top:18px">
+      AI 모델을 준비하고 있습니다.
+    </div>
+
+    <div id="result" class="result">
+      <h2>분석 결과</h2>
+      <div id="grade" class="grade"></div>
+      <p id="description"></p>
+      <div id="scores"></div>
+      <p class="small">
+        표시되는 점수는 모델의 상대적인 예측 점수이며,
+        실제 손상 정도나 확률의 정확성을 보장하지 않습니다.
+      </p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2. 긁힘 등급 기준</h2>
+
+    <div class="grade-list">
+      <div class="grade-item">
+        <h3>1단계 · 정상</h3>
+        <p>눈에 띄는 긁힘이 거의 없는 상태</p>
+      </div>
+
+      <div class="grade-item">
+        <h3>2단계 · 경미</h3>
+        <p>가느다란 긁힘이 일부 보이는 상태</p>
+      </div>
+
+      <div class="grade-item">
+        <h3>3단계 · 중간</h3>
+        <p>여러 개의 긁힘이 뚜렷한 상태</p>
+      </div>
+
+      <div class="grade-item">
+        <h3>4단계 · 심함</h3>
+        <p>넓은 마모나 코팅 벗겨짐이 보이는 상태</p>
+      </div>
+    </div>
+
+    <p class="small">
+      이 등급은 예시 기준입니다. 실제 판별 성능을 확보하려면
+      각 등급에 해당하는 프라이팬 사진으로 모델을 학습해야 합니다.
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>3. AI 모델에 대한 안내</h2>
+    <p>
+      이 웹페이지는 브라우저에서 이미지 분석을 실행하도록 구성되어 있습니다.
+      기본 이미지 모델은 일반적인 사물의 특징을 추출하는 데 사용되며,
+      프라이팬의 긁힘 등급을 학습한 전용 모델은 아닙니다.
+    </p>
+    <p>
+      따라서 전용 모델을 연결하기 전까지는 긁힘 등급을 신뢰성 있게
+      판별할 수 없습니다. 실제 프라이팬 사진 데이터로 학습된 모델을
+      연결해야 등급별 예측이 의미를 갖습니다.
+    </p>
+  </section>
+</main>
+
+<footer>
+  프라이팬 긁힘 AI · GitHub Pages 웹 프로토타입
+</footer>
+
+<script>
+  const input = document.getElementById("imageInput");
+  const preview = document.getElementById("preview");
+  const button = document.getElementById("analyzeBtn");
+  const status = document.getElementById("status");
+  const result = document.getElementById("result");
+
+  let selectedImage = null;
+  let generalModel = null;
+
+  const grades = [
+    {
+      name: "정상",
+      description: "눈에 띄는 긁힘이 거의 없는 상태"
+    },
+    {
+      name: "경미한 긁힘",
+      description: "얕거나 가느다란 긁힘이 일부 있는 상태"
+    },
+    {
+      name: "중간 긁힘",
+      description: "여러 개의 긁힘이 뚜렷하게 보이는 상태"
+    },
+    {
+      name: "심한 긁힘",
+      description: "넓은 마모 또는 코팅 손상이 보이는 상태"
+    }
+  ];
+
+  async function initialize() {
+    try {
+      await tf.ready();
+
+      status.textContent =
+        "브라우저 AI 엔진이 준비되었습니다. 전용 긁힘 학습 모델은 아직 연결되지 않았습니다.";
+
+      button.disabled = true;
+    } catch (error) {
+      status.textContent =
+        "AI 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.";
+    }
+  }
+
+  input.addEventListener("change", event => {
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      status.textContent = "이미지 파일을 선택해 주세요.";
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      preview.onload = () => {
+        selectedImage = preview;
+        result.style.display = "none";
+
+        status.textContent =
+          "사진이 준비되었습니다. 현재 전용 긁힘 학습 모델이 연결되지 않아 실제 등급 판별은 비활성화되어 있습니다.";
+
+        button.disabled = true;
+      };
+
+      preview.src = reader.result;
+      preview.style.display = "block";
+    };
+
+    reader.readAsDataURL(file);
+  });
+
+  button.addEventListener("click", async () => {
+    if (!selectedImage || !generalModel) return;
+
+    status.textContent =
+      "일반 이미지 모델은 프라이팬 긁힘 등급을 판별하도록 학습되지 않았습니다.";
+
+    result.style.display = "none";
+  });
+
+  initialize();
+</script>
+</body>
+</html>
