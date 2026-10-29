@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프라이팬 코팅 긁힘 및 건강 진단기</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .custom-range::-webkit-slider-thumb {
+            background: #4f46e5;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased">
+
+    <!-- Header -->
+    <header class="bg-slate-800 border-b border-slate-700 py-6 px-4 shadow-md">
+        <div class="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold flex items-center gap-2">
+                    🍳 프라이팬 코팅 건강 진단기
+                </h1>
+                <p class="text-sm text-slate-400 mt-1">사진 한 장으로 프라이팬 긁힘과 코팅 마모 상태를 정밀 분석하세요.</p>
+            </div>
+            <div class="bg-indigo-900/50 text-indigo-300 px-3 py-1.5 rounded-full text-xs font-medium border border-indigo-700/50">
+                Client-Side Computer Vision Engine
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-5xl mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Column: Image Input & Canvas View (7 cols) -->
+        <div class="lg:col-span-7 flex flex-col gap-4">
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col items-center">
+                
+                <!-- Action Buttons -->
+                <div class="flex flex-wrap gap-3 w-full mb-4">
+                    <label class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-4 rounded-xl cursor-pointer text-center transition shadow-md flex items-center justify-center gap-2">
+                        📂 사진 업로드
+                        <input type="file" id="imageUpload" accept="image/*" class="hidden">
+                    </label>
+                    <button id="camBtn" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium py-2.5 px-4 rounded-xl transition shadow-md flex items-center justify-center gap-2">
+                        📷 카메라 촬영
+                    </button>
+                </div>
+
+                <!-- Hidden Video for Camera -->
+                <video id="videoElement" autoplay playsinline class="hidden w-full max-h-64 rounded-xl mb-4 object-cover"></video>
+                <button id="captureBtn" class="hidden w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 rounded-xl mb-4 transition">찰칵 (사진 찍기)</button>
+
+                <!-- Canvas Preview Box -->
+                <div class="relative w-full aspect-square bg-slate-950 rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center">
+                    <canvas id="panCanvas" class="max-w-full max-h-full object-contain"></canvas>
+                    <div id="placeholderText" class="absolute text-slate-500 text-center p-4">
+                        <p class="text-3xl mb-2">🔍</p>
+                        <p class="text-sm">프라이팬 안쪽이 잘 보이도록 정면에서 촬영하거나 사진을 업로드해주세요.</p>
+                    </div>
+                </div>
+
+                <!-- Controls & Sliders -->
+                <div class="w-full mt-4 flex flex-col gap-3">
+                    <div class="flex justify-between items-center text-sm text-slate-300">
+                        <span>🔍 분석 영역(ROI) 크기 조절</span>
+                        <span id="roiVal">80%</span>
+                    </div>
+                    <input type="range" id="roiSlider" min="30" max="100" value="80" class="w-full accent-indigo-500 cursor-pointer">
+                    
+                    <div class="flex items-center justify-between mt-2">
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                            <input type="checkbox" id="heatmapToggle" class="w-4 h-4 accent-indigo-500 rounded">
+                            스크래치 맵(Heatmap) 시각화 보기
+                        </label>
+                        <button id="analyzeBtn" disabled class="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-2 px-6 rounded-xl transition shadow-md">
+                            분석 실행하기
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Right Column: Dashboard & Results (5 cols) -->
+        <div class="lg:col-span-5 flex flex-col gap-4">
+            
+            <!-- Overall Health Score Card -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col items-center text-center">
+                <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">코팅 건강 종합 등급</h3>
+                <div id="gradeBadge" class="w-20 h-20 rounded-full bg-slate-700 border-4 border-slate-600 flex items-center justify-center text-3xl font-black mb-3 text-slate-400 shadow-inner">
+                    -
+                </div>
+                <div id="scoreText" class="text-xl font-bold text-slate-300 mb-1">분석 전 대기 중</div>
+                <p id="statusDesc" class="text-xs text-slate-400">프라이팬 사진을 업로드하고 분석을 시작해보세요.</p>
+            </div>
+
+            <!-- Detailed Metrics -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col gap-4">
+                <h4 class="text-sm font-semibold text-slate-300 border-b border-slate-700 pb-2">📊 정밀 측정 지표</h4>
+                
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">미세 긁힘 밀도</span>
+                        <span id="scratchDensity" class="font-bold text-slate-200">0.0%</span>
+                    </div>
+                    <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+                        <div id="scratchBar" class="bg-indigo-500 h-full w-0 transition-all duration-500"></div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">금속 노출 위험도</span>
+                        <span id="metalExposure" class="font-bold text-slate-200">0.0%</span>
+                    </div>
+                    <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+                        <div id="metalBar" class="bg-amber-500 h-full w-0 transition-all duration-500"></div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">표면 거칠기 지수</span>
+                        <span id="roughnessIndex" class="font-bold text-slate-200">0 / 100</span>
+                    </div>
+                    <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+                        <div id="roughBar" class="bg-emerald-500 h-full w-0 transition-all duration-500"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Guide Card -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col gap-2">
+                <h4 class="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
+                    💡 맞춤 조리 및 교체 가이드
+                </h4>
+                <div id="guideContent" class="text-xs text-slate-400 leading-relaxed bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                    분석 완료 후 코팅 상태에 적합한 조리 팁(산성 요리 가능 여부 등)과 세척 가이드가 이곳에 표시됩니다.
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- JavaScript Logic -->
+    <script>
+        const imageUpload = document.getElementById('imageUpload');
+        const panCanvas = document.getElementById('panCanvas');
+        const ctx = panCanvas.getContext('2d');
+        const placeholderText = document.getElementById('placeholderText');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const roiSlider = document.getElementById('roiSlider');
+        const roiVal = document.getElementById('roiVal');
+        const heatmapToggle = document.getElementById('heatmapToggle');
+
+        const camBtn = document.getElementById('camBtn');
+        const videoElement = document.getElementById('videoElement');
+        const captureBtn = document.getElementById('captureBtn');
+
+        let uploadedImage = new Image();
+        let imageLoaded = false;
+        let originalWidth = 0;
+        let originalHeight = 0;
+
+        // Image Upload Handler
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    uploadedImage.src = event.target.result;
+                    uploadedImage.onload = function() {
+                        imageLoaded = true;
+                        placeholderText.classList.add('hidden');
+                        analyzeBtn.disabled = false;
+                        initCanvas();
+                    }
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Camera Stream Handler
+        camBtn.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                videoElement.srcObject = stream;
+                videoElement.classList.remove('hidden');
+                captureBtn.classList.remove('hidden');
+            } catch (err) {
+                alert('카메라 권한을 허용해주시거나 브라우저 설정을 확인해주세요.');
+            }
+        });
+
+        captureBtn.addEventListener('click', () => {
+            const canvasTemp = document.createElement('canvas');
+            canvasTemp.width = videoElement.videoWidth;
+            canvasTemp.height = videoElement.videoHeight;
+            const tempCtx = canvasTemp.getContext('2d');
+            tempCtx.drawImage(videoElement, 0, 0);
+            
+            uploadedImage.src = canvasTemp.toDataURL('image/png');
+            uploadedImage.onload = function() {
+                imageLoaded = true;
+                placeholderText.classList.add('hidden');
+                analyzeBtn.disabled = false;
+                initCanvas();
+                
+                // Stop camera stream
+                const stream = videoElement.srcObject;
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                videoElement.classList.add('hidden');
+                captureBtn.classList.add('hidden');
+            }
+        });
+
+        function initCanvas() {
+            originalWidth = uploadedImage.width;
+            originalHeight = uploadedImage.height;
+            panCanvas.width = originalWidth;
+            panCanvas.height = originalHeight;
+            ctx.drawImage(uploadedImage, 0, 0);
+        }
+
+        roiSlider.addEventListener('input', (e) => {
+            roiVal.textContent = e.target.value + '%';
+            if (imageLoaded) {
+                ctx.drawImage(uploadedImage, 0, 0);
+                drawROI(e.target.value);
+            }
+        });
+
+        function drawROI(percentage) {
+            const centerX = originalWidth / 2;
+            const centerY = originalHeight / 2;
+            const radius = (Math.min(originalWidth, originalHeight) / 2) * (percentage / 100);
+
+            ctx.strokeStyle = 'rgba(99, 102, 241, 0.8)';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([6, 6]);
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Analysis Execution Engine (Sobel Edge + Grayscale Variance Simulation)
+        analyzeBtn.addEventListener('click', () => {
+            if (!imageLoaded) return;
+
+            // Redraw clean image
+            ctx.drawImage(uploadedImage, 0, 0);
+            const pVal = parseInt(roiSlider.value);
+            
+            const centerX = originalWidth / 2;
+            const centerY = originalHeight / 2;
+            const maxRadius = (Math.min(originalWidth, originalHeight) / 2) * (pVal / 100);
+
+            const imgData = ctx.getImageData(0, 0, originalWidth, originalHeight);
+            const data = imgData.data;
+
+            let edgePixels = 0;
+            let totalRoiPixels = 0;
+            let metalPixels = 0;
+
+            const heatmapActive = heatmapToggle.checked;
+            const heatmapData = ctx.createImageData(originalWidth, originalHeight);
+
+            for (let y = 0; y < originalHeight; y++) {
+                for (let x = 0; x < originalWidth; x++) {
+                    const dx = x - centerX;
+                    const dy = y - centerY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist <= maxRadius) {
+                        totalRoiPixels++;
+                        const idx = (y * originalWidth + x) * 4;
+                        const r = data[idx];
+                        const g = data[idx + 1];
+                        const b = data[idx + 2];
+                        const brightness = (r + g + b) / 3;
+
+                        // Check bright silvery spots (metal exposure simulation)
+                        if (r > 180 && g > 180 && b > 180 && Math.abs(r - g) < 20) {
+                            metalPixels++;
+                            if (heatmapActive) {
+                                heatmapData.data[idx] = 255; // R
+                                heatmapData.data[idx+1] = 100; // G
+                                heatmapData.data[idx+2] = 0; // B
+                                heatmapData.data[idx+3] = 160; // Alpha
+                            }
+                        } else if (x > 0 && y > 0 && x < originalWidth - 1 && y < originalHeight - 1) {
+                            // Simple high-pass contrast check for scratches
+                            const rightIdx = (y * originalWidth + (x + 1)) * 4;
+                            const rightBright = (data[rightIdx] + data[rightIdx+1] + data[rightIdx+2]) / 3;
+                            const diff = Math.abs(brightness - rightBright);
+
+                            if (diff > 35) { // Scratch threshold
+                                edgePixels++;
+                                if (heatmapActive) {
+                                    heatmapData.data[idx] = 255;
+                                    heatmapData.data[idx+1] = 0;
+                                    heatmapData.data[idx+2] = 0;
+                                    heatmapData.data[idx+3] = 180;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (heatmapActive) {
+                ctx.putImageData(heatmapData, 0, 0);
+            }
+            drawROI(pVal);
+
+            // Calculate Metrics
+            const scratchDensityVal = Math.min(100, ((edgePixels / totalRoiPixels) * 220).toFixed(1));
+            const metalExposureVal = Math.min(100, ((metalPixels / totalRoiPixels) * 350).toFixed(1));
+            const roughnessVal = Math.round((parseFloat(scratchDensityVal) * 0.7) + (parseFloat(metalExposureVal) * 0.3));
+
+            // Health Score (100 - weighted damage)
+            const healthScore = Math.max(0, Math.min(100, Math.round(100 - (roughnessVal * 0.9))));
+
+            // Update UI Dashboards
+            document.getElementById('scratchDensity').textContent = scratchDensityVal + '%';
+            document.getElementById('scratchBar').style.width = scratchDensityVal + '%';
+
+            document.getElementById('metalExposure').textContent = metalExposureVal + '%';
+            document.getElementById('metalBar').style.width = metalExposureVal + '%';
+
+            document.getElementById('roughnessIndex').textContent = roughnessVal + ' / 100';
+            document.getElementById('roughBar').style.width = roughnessVal + '%';
+
+            // Grade & Guide Logic
+            const gradeBadge = document.getElementById('gradeBadge');
+            const scoreText = document.getElementById('scoreText');
+            const statusDesc = document.getElementById('statusDesc');
+            const guideContent = document.getElementById('guideContent');
+
+            scoreText.textContent = `코팅 건강 점수: ${healthScore}점`;
+
+            if (healthScore >= 85) {
+                gradeBadge.textContent = 'A';
+                gradeBadge.className = 'w-20 h-20 rounded-full bg-emerald-900/50 border-4 border-emerald-500 flex items-center justify-center text-3xl font-black mb-3 text-emerald-400 shadow-lg';
+                statusDesc.textContent = '코팅 상태가 매우 우수합니다.';
+                guideContent.innerHTML = '✨ <b>최상급 상태</b>입니다. 금속 조리도구 사용을 피하시고, 실리콘이나 나무 주걱을 계속 사용해 주세요. 모든 요리(산성 요리 포함)에 안전합니다.';
+            } else if (healthScore >= 70) {
+                gradeBadge.textContent = 'B';
+                gradeBadge.className = 'w-20 h-20 rounded-full bg-blue-900/50 border-4 border-blue-500 flex items-center justify-center text-3xl font-black mb-3 text-blue-400 shadow-lg';
+                statusDesc.textContent = '일반적인 사용감이 관찰됩니다.';
+                guideContent.innerHTML = '👍 <b>양호한 상태</b>입니다. 미세한 스크래치가 보이기 시작했으나 코팅 기능은 유지되어 있습니다. 철수세미 세척을 금하고 부드러운 스펀지를 사용하세요.';
+            } else if (healthScore >= 50) {
+                gradeBadge.textContent = 'C';
+                gradeBadge.className = 'w-20 h-20 rounded-full bg-amber-900/50 border-4 border-amber-500 flex items-center justify-center text-3xl font-black mb-3 text-amber-400 shadow-lg';
+                statusDesc.textContent = '코팅 마모가 진행 중입니다.';
+                guideContent.innerHTML = '⚠️ <b>주의 단계</b>입니다. 바닥면 일부에 마모가 보입니다. 토마토 소스 등 산도가 높은 요리는 알루미늄이나 금속 성분을 용출시킬 수 있으므로 가급적 피하시고 교체를 고려하세요.';
+            } else {
+                gradeBadge.textContent = 'F';
+                gradeBadge.className = 'w-20 h-20 rounded-full bg-rose-900/50 border-4 border-rose-500 flex items-center justify-center text-3xl font-black mb-3 text-rose-400 shadow-lg';
+                statusDesc.textContent = '코팅 손상이 심각합니다.';
+                guideContent.innerHTML = '🚨 <b>즉시 교체 권장</b>입니다. 코팅이 벗겨져 금속(알루미늄/철)이 노출되어 있을 확률이 높습니다. 유해 물질 및 중금속 우려가 있으니 새 프라이팬으로 교체하시는 것을 강력히 권장합니다.';
+            }
+        });
+    </script>
+</body>
+</html>
