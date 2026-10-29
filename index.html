@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프라이팬 긁힘 진단 AI</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #f4f7f6;
+            text-align: center;
+            margin: 0;
+            padding: 50px;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h2 { color: #333; }
+        p { color: #666; font-size: 0.95em; }
+        #imagePreview {
+            max-width: 100%;
+            max-height: 300px;
+            margin-top: 20px;
+            border-radius: 8px;
+            display: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        #result {
+            margin-top: 20px;
+            text-align: left;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .result-item {
+            margin: 8px 0;
+            font-weight: bold;
+            color: #444;
+        }
+        input[type="file"] {
+            margin: 20px 0;
+        }
+        .loading { color: #ff9800; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🍳 프라이팬 긁힘 진단 AI</h2>
+        <p>진단할 프라이팬 사진을 업로드해 주세요.</p>
+        
+        <input type="file" id="imageUpload" accept="image/*" onchange="previewImage(event)"><br>
+        <img id="imagePreview" alt="업로드된 이미지 미리보기"><br>
+        
+        <div id="result">
+            <span class="loading">AI 모델을 불러오는 중입니다...</span>
+        </div>
+    </div>
+
+    <!-- TensorFlow.js 및 Teachable Machine 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <script>
+        // 👉 [필수 입력] Teachable Machine에서 모델 학습 후 [Export Model] -> [Cloud Upload]를 눌러 
+        // 생성된 공유 링크(URL)를 아래 따옴표 안에 넣어주세요!
+        // 예시: const URL = "https://teachablemachine.withgoogle.com/models/AbCdEfGhI/";
+        const URL = "여기에_티처블머신_공유링크를_넣으세요/";
+
+        let model, maxPredictions;
+
+        // 페이지 로드 시 AI 모델 초기화
+        async function init() {
+            if (URL.includes("여기에_티처블")) {
+                document.getElementById("result").innerHTML = "<p style='color:red;'>⚠️ 코드 안의 <code>URL</code> 변수에 본인의 Teachable Machine 공유 링크를 입력해주세요!</p>";
+                return;
+            }
+
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            try {
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+                document.getElementById("result").innerHTML = "<p>모델 로드 완료! 사진을 업로드하면 자동으로 분석됩니다.</p>";
+            } catch (error) {
+                document.getElementById("result").innerHTML = "<p style='color:red;'>모델을 불러오지 못했습니다. 링크를 확인해주세요.</p
